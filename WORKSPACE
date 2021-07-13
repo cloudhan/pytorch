@@ -124,7 +124,7 @@ new_patched_local_repository(
     patches = [
         "@//third_party:tbb.patch",
     ],
-    patch_strip = 1,
+    patch_args= ["-p1"],
     build_file = "//third_party:tbb.BUILD",
     path = "third_party/tbb",
 )
