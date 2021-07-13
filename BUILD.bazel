@@ -1966,6 +1966,7 @@ cc_library(
     deps = [
         ":torch",
         ":shm",
+        "@pybind11",
     ],
 )
 
