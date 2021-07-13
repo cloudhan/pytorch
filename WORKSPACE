@@ -159,6 +159,7 @@ http_archive(
     url = "https://github.com/bazelbuild/rules_python/releases/download/0.3.0/rules_python-0.3.0.tar.gz",
     sha256 = "934c9ceb552e84577b0faf1e5a2f0450314985b4d8712b2b70717dc679fdc01b",
 )
+
 load("@rules_python//python:pip.bzl", "pip_install")
 pip_install(
     name = "pytorch_dev_deps",
@@ -171,5 +172,4 @@ load("@pybind11_bazel//:python_configure.bzl", "python_configure")
 python_configure(name = "local_config_python")
 
 load("@com_google_protobuf//:protobuf_deps.bzl", "protobuf_deps")
-
 protobuf_deps()
