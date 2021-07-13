@@ -3,6 +3,13 @@ load("@//third_party:substitution.bzl", "template_rule")
 
 licenses(["notice"])  # Apache 2.0
 
+config_setting(
+    name = "msvc",
+    flag_values = {
+        "@bazel_tools//tools/cpp:compiler": "msvc-cl",
+    },
+)
+
 template_rule(
     name = "version_string",
     src = "@//:aten/src/ATen/cpu/tbb/extra/version_string.ver.in",
@@ -44,15 +51,19 @@ cc_library(
     copts = [
         "-Iexternal/tbb/src/rml/include",
         "-Iexternal/tbb/src",
-        "-pthread",
         "-DDO_ITT_NOTIFY=1",
-        "-DUSE_PTHREAD=1",
         "-D__TBB_BUILD=1",
         "-D__TBB_DYNAMIC_LOAD_ENABLED=0",
         "-D__TBB_SOURCE_DIRECTLY_INCLUDED=1",
-        "-fno-sanitize=vptr",
-        "-fno-sanitize=thread",
-    ],
+    ] + select({
+        ":msvc": ["-DUSE_WINTHREAD=1"],
+        "//conditions:default": [
+            "-fno-sanitize=vptr",
+            "-fno-sanitize=thread",
+            "-pthread",
+            "-DUSE_PTHREAD=1",
+        ],
+    }),
     defines = [
         # TBB Cannot detect the standard library version when using clang with libstdc++.
         # See https://github.com/01org/tbb/issues/22
@@ -65,11 +76,13 @@ cc_library(
         "include",
         "src/tbb/tools_api",
     ],
-    linkopts = [
-        "-ldl",
-        "-lpthread",
-        "-lrt",
-    ],
+    linkopts = [] + select({":msvc": [],
+        "//conditions:default": [
+            "-ldl",
+            "-lpthread",
+            "-lrt",
+        ],
+    }),
     textual_hdrs = ["src/tbb/tools_api/ittnotify_static.c"],
     visibility = ["//visibility:public"],
 )
