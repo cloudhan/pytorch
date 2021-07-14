@@ -97,8 +97,14 @@ new_local_repository(
 )
 
 new_local_repository(
+    name = "clog",
+    build_file = "//third_party/XNNPACK/third_party:clog.BUILD",
+    path = "third_party/cpuinfo",
+)
+
+new_local_repository(
     name = "cpuinfo",
-    build_file = "//third_party:cpuinfo.BUILD",
+    build_file = "//third_party/XNNPACK/third_party:cpuinfo.BUILD",
     path = "third_party/cpuinfo",
 )
 
