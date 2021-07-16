@@ -5,6 +5,21 @@
 
 load("@bazel_skylib//lib:selects.bzl", "selects")
 
+def if_linux(if_true, if_false = []):
+    return select({
+        "@platforms//os:linux": if_true,
+        "//conditions:default": if_false,
+    })
+
+def if_msvc(if_true, if_false = []):
+    return select({
+        "@//:msvc": if_true,
+        "//conditions:default": if_false,
+    })
+
+def if_not_msvc(if_true, if_false = []):
+    return if_msvc(if_false, if_true)
+
 def if_cuda(if_true, if_false = []):
     """Helper for selecting based on the whether CUDA is configured. """
     return selects.with_or({
