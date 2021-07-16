@@ -6,17 +6,19 @@ load("@rules_python//python/pip_install:repositories.bzl", "requirement")
 load("//third_party:substitution.bzl", "header_template_rule")
 load("//:tools/build_variables.bzl", "torch_cpp_srcs", "libtorch_python_core_sources", "libtorch_core_sources", "libtorch_distributed_sources", "libtorch_extra_sources", "jit_core_sources")
 load("//tools/rules:cu.bzl", "cu_library")
-load("//tools/config:defs.bzl", "if_cuda")
+load("//tools/config:defs.bzl", "if_cuda", "if_linux", "if_msvc")
 load("//:aten.bzl", "intern_build_aten_ops")
 
+config_setting(
+    name = "msvc",
+    flag_values = {
+        "@bazel_tools//tools/cpp:compiler": "msvc-cl",
+    },
+)
+
 COMMON_COPTS = [
-    "-DHAVE_MALLOC_USABLE_SIZE=1",
-    "-DHAVE_MMAP=1",
-    "-DHAVE_SHM_OPEN=1",
-    "-DHAVE_SHM_UNLINK=1",
-    "-D_FILE_OFFSET_BITS=64",
-    "-DHAVE_GCC_GET_CPUID",
-    "-DUSE_GCC_GET_CPUID",
+    "-DHAVE_GCC_GET_CPUID", # this seems to do no harm on windows+msvc
+    "-DUSE_GCC_GET_CPUID",  # this seems to do no harm on windows+msvc
     "-DTH_HAVE_THREAD",
     "-DUSE_FBGEMM",
     "-DUSE_DISTRIBUTED",
@@ -25,6 +27,12 @@ COMMON_COPTS = [
 ] + if_cuda([
     "-DUSE_CUDA",
     "-DUSE_CUDNN",
+]) + if_linux([
+    "-DHAVE_MALLOC_USABLE_SIZE=1",
+    "-DHAVE_MMAP=1",
+    "-DHAVE_SHM_OPEN=1",
+    "-DHAVE_SHM_UNLINK=1",
+    "-D_FILE_OFFSET_BITS=64",
 ])
 
 # c10
@@ -74,14 +82,14 @@ cc_library(
         "c10/core/impl/*.cpp",
         "c10/mobile/*.cpp",
         "c10/util/*.cpp",
-    ]) + if_cuda(
-        glob([
-            "c10/cuda/*.cpp",
-            "c10/cuda/impl/*.cpp",
-        ]),
-        [],
-    ),
-    copts = ["-DCAFFE2_BUILD_MAIN_LIB"],
+    ]) + if_cuda(glob([
+        "c10/cuda/*.cpp",
+        "c10/cuda/impl/*.cpp",
+    ])),
+    copts = [
+        "-DC10_BUILD_MAIN_LIB",
+        "-DCAFFE2_BUILD_MAIN_LIB"
+    ],
     deps = [
         ":c10_headers",
         "@fmt",
@@ -597,7 +605,8 @@ cc_library(
 ATEN_COPTS = COMMON_COPTS + [
     "-DUSE_AVX",
     "-DUSE_AVX2",
-    "-DCAFFE2_BUILD_MAIN_LIBS",
+    "-DC10_BUILD_MAIN_LIB",
+    "-DCAFFE2_BUILD_MAIN_LIB",
     "-DHAVE_AVX_CPU_DEFINITION",
     "-DHAVE_AVX2_CPU_DEFINITION",
     "-fvisibility-inlines-hidden",
@@ -733,13 +742,13 @@ cu_library(
 # caffe2
 CAFFE2_COPTS = COMMON_COPTS + [
     "-Dcaffe2_EXPORTS",
-    "-DCAFFE2_USE_GLOO",
-    "-DCAFFE2_USE_CUDNN",
+    # "-DCAFFE2_USE_CUDNN",
+    "-DC10_BUILD_MAIN_LIB",
     "-DCAFFE2_BUILD_MAIN_LIB",
     "-fvisibility-inlines-hidden",
     "-fno-math-errno",
     "-fno-trapping-math",
-]
+] + if_linux(["-DCAFFE2_USE_GLOO"])
 
 proto_library(
     name = "caffe2_proto_source",
@@ -777,21 +786,6 @@ header_template_rule(
         "#define CAFFE2_USE_NVTX": "/* #undef CAFFE2_USE_NVTX */",
         "#define CAFFE2_USE_TRT": "/* #undef CAFFE2_USE_TRT */",
     },
-)
-
-filegroup(
-    name = "caffe2_contrib_srcs",
-    srcs = [
-        "caffe2/contrib/gloo/allgather_ops.cc",
-        "caffe2/contrib/gloo/allreduce_ops.cc",
-        "caffe2/contrib/gloo/barrier_ops.cc",
-        "caffe2/contrib/gloo/broadcast_ops.cc",
-        "caffe2/contrib/gloo/common.cc",
-        "caffe2/contrib/gloo/common_world_ops.cc",
-        "caffe2/contrib/gloo/context.cc",
-        "caffe2/contrib/gloo/reduce_scatter_ops.cc",
-        "caffe2/contrib/gloo/store_handler.cc",
-    ],
 )
 
 filegroup(
@@ -843,6 +837,37 @@ filegroup(
         "caffe2/core/workspace.cc",
     ],
 )
+
+filegroup(
+    name = "caffe2_gloo_hdrs",
+    srcs = glob(["caffe2/contrib/gloo/*.h"]),
+)
+
+filegroup(
+    name = "caffe2_gloo_srcs",
+    srcs = [
+        "caffe2/contrib/gloo/allgather_ops.cc",
+        "caffe2/contrib/gloo/allreduce_ops.cc",
+        "caffe2/contrib/gloo/barrier_ops.cc",
+        "caffe2/contrib/gloo/broadcast_ops.cc",
+        "caffe2/contrib/gloo/common.cc",
+        "caffe2/contrib/gloo/common_world_ops.cc",
+        "caffe2/contrib/gloo/context.cc",
+        "caffe2/contrib/gloo/reduce_scatter_ops.cc",
+        "caffe2/contrib/gloo/store_handler.cc",
+    ],
+)
+
+filegroup(
+    name = "caffe2_gloo_gpu_srcs",
+    srcs = [
+        "caffe2/contrib/aten/aten_op_gpu.cc",
+        "caffe2/contrib/gloo/allreduce_ops_gpu.cc",
+        "caffe2/contrib/gloo/broadcast_ops_gpu.cc",
+        "caffe2/contrib/gloo/common_world_ops_gpu.cc",
+    ],
+)
+
 
 filegroup(
     name = "caffe2_distributed_srcs",
@@ -1348,10 +1373,6 @@ filegroup(
 filegroup(
     name = "caffe2_cuda_srcs",
     srcs = [
-        "caffe2/contrib/aten/aten_op_gpu.cc",
-        "caffe2/contrib/gloo/allreduce_ops_gpu.cc",
-        "caffe2/contrib/gloo/broadcast_ops_gpu.cc",
-        "caffe2/contrib/gloo/common_world_ops_gpu.cc",
         "caffe2/core/blob_serialization_gpu.cc",
         "caffe2/core/common_cudnn.cc",
         "caffe2/core/common_gpu.cc",
@@ -1600,7 +1621,6 @@ cc_library(
     name = "caffe2_headers",
     hdrs = glob([
         "caffe2/contrib/aten/*.h",
-        "caffe2/contrib/gloo/*.h",
         "caffe2/core/*.h",
         "caffe2/core/nomnigraph/include/nomnigraph/Converters/*.h",
         "caffe2/core/nomnigraph/include/nomnigraph/Generated/*.h",
@@ -1682,7 +1702,6 @@ cc_library(
         "caffe2/db/create_db_op.cc",
         "caffe2/db/protodb.cc",
         "caffe2/share/contrib/depthwise/depthwise3x3_conv_op.cc",
-        ":caffe2_contrib_srcs",
         ":caffe2_core_srcs",
         ":caffe2_distributed_srcs",
         ":caffe2_ideep_srcs",
@@ -1713,7 +1732,6 @@ cc_library(
         "@eigen",
         "@fbgemm//:fbgemm_src_headers",
         "@foxi",
-        "@gloo",
         "@onnx",
         "@fmt",
     ] + if_cuda(
@@ -1724,9 +1742,9 @@ cc_library(
         ],
         [
             ":aten",
-            "@tensorpipe//:tensorpipe_cpu",
+            # "@tensorpipe//:tensorpipe_cpu"
         ],
-    ),
+    ) + if_linux([":gloo", "@gloo"]),
     alwayslink = True,
 )
 
@@ -1761,6 +1779,8 @@ cu_library(
     alwayslink = True,
 )
 
+# cc_library()
+
 PERF_COPTS = [
     "-DHAVE_GCC_GET_CPUID",
     "-DUSE_AVX",
@@ -1768,20 +1788,27 @@ PERF_COPTS = [
     "-DTH_HAVE_THREAD",
     "-DHAVE_AVX_CPU_DEFINITION",
     "-DHAVE_AVX2_CPU_DEFINITION",
-    "-DENABLE_ALIAS=1",
-    "-DHAVE_MALLOC_USABLE_SIZE=1",
-    "-DHAVE_MMAP=1",
-    "-DHAVE_SHM_OPEN=1",
-    "-DHAVE_SHM_UNLINK=1",
-    "-DSLEEF_STATIC_LIBS=1",
-    "-D_FILE_OFFSET_BITS=64",
     "-DUSE_FBGEMM",
-    "-fvisibility-inlines-hidden",
-    "-Wunused-parameter",
-    "-fno-math-errno",
-    "-fno-trapping-math",
-    "-mf16c",
-]
+] + if_msvc(
+    [
+        "/wd4100",
+        "/wd4101",
+    ],
+    [
+        "-DSLEEF_STATIC_LIBS=1",
+        "-D_FILE_OFFSET_BITS=64",
+        "-DHAVE_MALLOC_USABLE_SIZE=1",
+        "-DHAVE_MMAP=1",
+        "-DHAVE_SHM_OPEN=1",
+        "-DHAVE_SHM_UNLINK=1",
+        "-fvisibility-inlines-hidden",
+        "-DENABLE_ALIAS=1",
+        "-Wunused-parameter",
+        "-fno-math-errno",
+        "-fno-trapping-math",
+        "-mf16c",
+    ],
+)
 
 PERF_HEADERS = glob([
     "caffe2/perfkernels/*.h",
@@ -1794,9 +1821,14 @@ cc_library(
         "caffe2/perfkernels/*_avx.cc",
     ]),
     hdrs = PERF_HEADERS,
-    copts = PERF_COPTS + [
-        "-mavx",
-    ],
+    copts = PERF_COPTS + if_msvc(
+        [
+            "/arch:AVX",
+        ],
+        [
+            "-mavx",
+        ],
+    ),
     visibility = ["//visibility:public"],
     deps = [
         ":caffe2_headers",
@@ -1811,11 +1843,16 @@ cc_library(
         "caffe2/perfkernels/*_avx2.cc",
     ]),
     hdrs = PERF_HEADERS,
-    copts = PERF_COPTS + [
-        "-mavx2",
-        "-mfma",
-        "-mavx",
-    ],
+    copts = PERF_COPTS + if_msvc(
+        [
+            "/arch:AVX2",
+        ],
+        [
+            "-mavx2",
+            "-mfma",
+            "-mavx",
+        ],
+    ),
     visibility = ["//visibility:public"],
     deps = [
         ":caffe2_headers",
@@ -1830,14 +1867,19 @@ cc_library(
         "caffe2/perfkernels/common_avx512.cc",
     ],
     hdrs = PERF_HEADERS,
-    copts = PERF_COPTS + [
-        "-mavx512f",
-        "-mavx512dq",
-        "-mavx512vl",
-        "-mavx2",
-        "-mfma",
-        "-mavx",
-    ],
+    copts = PERF_COPTS + if_msvc(
+        [
+            "/arch:AVX512",
+        ],
+        [
+            "-mavx512f",
+            "-mavx512dq",
+            "-mavx512vl",
+            "-mavx2",
+            "-mfma",
+            "-mavx",
+        ]
+    ),
     visibility = ["//visibility:public"],
     deps = [
         ":caffe2_headers",
@@ -1901,11 +1943,10 @@ TORCH_COPTS = COMMON_COPTS + [
     "-Dtorch_EXPORTS",
     "-DHAVE_AVX_CPU_DEFINITION",
     "-DHAVE_AVX2_CPU_DEFINITION",
-    "-DCAFFE2_USE_GLOO",
     "-fvisibility-inlines-hidden",
     "-fno-math-errno ",
     "-fno-trapping-math",
-]
+] + if_linux(["-DCAFFE2_USE_GLOO"])
 
 cc_library(
     name = "torch",
