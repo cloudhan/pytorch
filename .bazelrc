@@ -1,2 +1,11 @@
-build --copt=--std=c++14
-build --copt=-I.
+build --announce_rc
+
+# gcc config
+build:gcc --copt=--std=c++14 --host_copt=--std=c++14
+build:gcc --copt=-Wno-unused-result --host_copt=-Wno-unused-result
+
+# msvc config
+build:msvc --copt=-DWIN32_LEAN_AND_MEAN --host_copt=-DWIN32_LEAN_AND_MEAN
+build:msvc --copt=/std:c++17 --host_copt=/std:c++17
+
+try-import %workspace%/user.bazelrc
