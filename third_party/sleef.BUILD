@@ -3,23 +3,10 @@ load("@//tools/config:defs.bzl", "if_msvc", "if_not_msvc")
 load("@//third_party:sleef.bzl", "sleef_cc_library")
 
 SLEEF_COPTS = [
-    "-DHAVE_MALLOC_USABLE_SIZE=1",
-    "-DHAVE_MMAP=1",
-    "-DHAVE_SHM_OPEN=1",
-    "-DHAVE_SHM_UNLINK=1",
-    "-DIDEEP_USE_MKL",
-    "-DDNNL_CPU_RUNTIME=TBB",
-    "-DONNX_ML=1",
-    "-DONNX_NAMESPACE=onnx",
-    "-DTH_BLAS_MKL",
-    "-D_FILE_OFFSET_BITS=64",
-    "-DCAFFE2_USE_GLOO",
-    "-DCUDA_HAS_FP16=1",
-    "-DHAVE_GCC_GET_CPUID",
     "-DUSE_AVX",
     "-DUSE_AVX2",
-    "-DTH_HAVE_THREAD",
 ] + if_not_msvc([
+    "-D_FILE_OFFSET_BITS=64",
     "-Wno-unused-result",
     "-ffp-contract=off",
     "-fno-math-errno",
