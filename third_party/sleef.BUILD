@@ -1,5 +1,5 @@
 load("@rules_cc//cc:defs.bzl", "cc_binary", "cc_library")
-load("@//tools/config:defs.bzl", "if_cuda", "if_linux", "if_msvc")
+load("@//tools/config:defs.bzl", "if_msvc", "if_not_msvc")
 load("@//third_party:sleef.bzl", "sleef_cc_library")
 
 SLEEF_COPTS = [
@@ -19,20 +19,19 @@ SLEEF_COPTS = [
     "-DUSE_AVX",
     "-DUSE_AVX2",
     "-DTH_HAVE_THREAD",
-] + if_msvc(
-    [],
-    [
-        "-Wno-unused-result",
-        "-ffp-contract=off",
-        "-fno-math-errno",
-        "-fno-trapping-math",
-        "-std=gnu99",
-    ],
-)
+] + if_not_msvc([
+    "-Wno-unused-result",
+    "-ffp-contract=off",
+    "-fno-math-errno",
+    "-fno-trapping-math",
+    "-std=gnu99",
+])
 
 SLEEF_COMMON_TARGET_COPTS = [
     "-DSLEEF_STATIC_LIBS=1",
-] + if_msvc([], ["-DENABLE_ALIAS=1"])
+] + if_not_msvc([
+    "-DENABLE_ALIAS=1",
+])
 
 SLEEF_PRIVATE_HEADERS = glob([
     "build/include/*.h",
@@ -214,17 +213,15 @@ cc_library(
         "src/libm/sleefdp.c",
         "src/libm/sleefld.c",
         "src/libm/sleefsp.c",
-    ] + if_msvc(
-        [],
-        ["src/libm/sleefqp.c"],
-    ),
+    ] + if_not_msvc([
+        "src/libm/sleefqp.c",
+    ]),
     hdrs = SLEEF_PUBLIC_HEADERS,
     copts = SLEEF_PRIVATE_INCLUDES + SLEEF_COPTS + SLEEF_COMMON_TARGET_COPTS + [
         "-DDORENAME=1",
-    ] + if_msvc(
-        [],
-        ["-DENABLEFLOAT128=1"],
-    ),
+    ] + if_not_msvc([
+        "-DENABLEFLOAT128=1",
+    ]),
     includes = SLEEF_PUBLIC_INCLUDES,
     # -lgcc resolves
     # U __addtf3
@@ -319,10 +316,9 @@ cc_library(
     copts = SLEEF_PRIVATE_INCLUDES + SLEEF_COPTS + SLEEF_COMMON_TARGET_COPTS + [
         "-DENABLE_AVX2=1",
         "-DENABLE_FMA4=1",
-    ] + if_msvc(
-        [],
-        ["-msse2"],
-    ),
+    ] + if_not_msvc([
+        "-msse2",
+    ]),
     includes = SLEEF_PUBLIC_INCLUDES,
     linkstatic = True,
     visibility = SLEEF_VISIBILITY,
@@ -468,10 +464,9 @@ sleef_cc_library(
     copts = SLEEF_PRIVATE_INCLUDES + SLEEF_COPTS + SLEEF_COMMON_TARGET_COPTS + [
         "-DDORENAME=1",
         "-DENABLE_SSE2=1",
-    ] + if_msvc(
-        [],
-        ["-msse2"],
-    ),
+    ] + if_not_msvc([
+        "-msse2",
+    ]),
     linkstatic = True,
     visibility = SLEEF_VISIBILITY,
     alwayslink = True,
@@ -487,10 +482,9 @@ sleef_cc_library(
     copts = SLEEF_PRIVATE_INCLUDES + SLEEF_COPTS + SLEEF_COMMON_TARGET_COPTS + [
         "-DDORENAME=1",
         "-DENABLE_SSE4=1",
-    ] + if_msvc(
-        [],
-        ["-msse4.1"],
-    ),
+    ] + if_not_msvc([
+        "-msse4.1",
+    ]),
     linkstatic = True,
     visibility = SLEEF_VISIBILITY,
     alwayslink = True,
