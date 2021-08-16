@@ -136,3 +136,6 @@
 [submodule "third_party/kineto"]
     path = third_party/kineto
     url = https://github.com/pytorch/kineto
+[submodule "code-reading"]
+    path = code-reading
+    url = git@github.com:cloudhan/pytorch-code-reading.git
